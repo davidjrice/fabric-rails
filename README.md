@@ -4,7 +4,7 @@
 
 This gem provides:
 
-  * fabric.js 0.8.52
+  * fabric.js 0.9.0
 
 ## Installation
 
