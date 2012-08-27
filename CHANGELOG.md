@@ -1,3 +1,7 @@
+## 0.0.6 (27 August 2012)
+
+  - fabric.js version 0.9.3
+
 ## 0.0.5 (24 August 2012)
 
   - fabric.js version 0.9.2
