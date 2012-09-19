@@ -1,7 +1,7 @@
 /* build: `node build.js modules=ALL` */
 /*! Fabric.js Copyright 2008-2012, Printio (Juriy Zaytsev, Maxim Chernyak) */
 
-var fabric = fabric || { version: "0.9.5" };
+var fabric = fabric || { version: "0.9.8" };
 
 if (typeof exports != 'undefined') {
   exports.fabric = fabric;
@@ -8016,20 +8016,9 @@ fabric.util.object.extend(fabric.StaticCanvas.prototype, {
           : this.fill;
       }
 
-      if (this.group && this.type === 'rect') {
-        if (m) {
-          ctx.translate(
-            -this.group.width / 2,
-            -this.group.height / 2
-          );
-          ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
-        }
-        else {
-          ctx.translate(
-            -this.group.width / 2 + this.width / 2,
-            -this.group.height / 2 + this.height / 2
-          );
-        }
+      if (m && this.group) {
+        ctx.translate(-this.group.width/2, -this.group.height/2);
+        ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
       }
 
       this._render(ctx, noTransform);
@@ -8135,10 +8124,11 @@ fabric.util.object.extend(fabric.StaticCanvas.prototype, {
      */
     setCoords: function() {
 
-      var strokeWidth = this.strokeWidth > 1 ? this.strokeWidth : 0;
+      var strokeWidth = this.strokeWidth > 1 ? this.strokeWidth : 0,
+          padding = this.padding;
 
-      this.currentWidth = (this.width + strokeWidth) * this.scaleX;
-      this.currentHeight = (this.height + strokeWidth) * this.scaleY;
+      this.currentWidth = (this.width + strokeWidth) * this.scaleX + padding * 2;
+      this.currentHeight = (this.height + strokeWidth) * this.scaleY + padding * 2;
 
       this._hypotenuse = Math.sqrt(
         Math.pow(this.currentWidth / 2, 2) +
@@ -8249,8 +8239,9 @@ fabric.util.object.extend(fabric.StaticCanvas.prototype, {
     drawBorders: function(ctx) {
       if (!this.hasBorders) return;
 
-      var padding2 = this.padding * 2,
-          MIN_SCALE_LIMIT = fabric.Object.MIN_SCALE_LIMIT,
+      var MIN_SCALE_LIMIT = fabric.Object.MIN_SCALE_LIMIT,
+          padding = this.padding,
+          padding2 = padding * 2,
           strokeWidth = this.strokeWidth > 1 ? this.strokeWidth : 0;
 
       ctx.save();
@@ -8269,14 +8260,20 @@ fabric.util.object.extend(fabric.StaticCanvas.prototype, {
           h = this.getHeight();
 
       ctx.strokeRect(
-        ~~(-(w / 2) - this.padding - strokeWidth / 2 * this.scaleX) + 0.5, // offset needed to make lines look sharper
-        ~~(-(h / 2) - this.padding - strokeWidth / 2 * this.scaleY) + 0.5,
+        ~~(-(w / 2) - padding - strokeWidth / 2 * this.scaleX) + 0.5, // offset needed to make lines look sharper
+        ~~(-(h / 2) - padding - strokeWidth / 2 * this.scaleY) + 0.5,
         ~~(w + padding2 + strokeWidth * this.scaleX),
         ~~(h + padding2 + strokeWidth * this.scaleY)
       );
 
       if (this.hasRotatingPoint && !this.hideCorners && !this.lockRotation) {
-        var rotateHeight = (this.flipY ? h + strokeWidth * this.scaleY : -h - strokeWidth * this.scaleY) / 2;
+
+        var rotateHeight = (
+          this.flipY
+            ? h + (strokeWidth * this.scaleY) + (padding * 2)
+            : -h - (strokeWidth * this.scaleY) - (padding * 2)
+        ) / 2;
+
         var rotateWidth = (-w/2);
 
         ctx.beginPath();
@@ -8362,82 +8359,97 @@ fabric.util.object.extend(fabric.StaticCanvas.prototype, {
       var size = this.cornersize,
           size2 = size / 2,
           strokeWidth2 = this.strokeWidth / 2,
-          padding = this.padding,
           left = -(this.width / 2),
           top = -(this.height / 2),
           _left,
           _top,
           sizeX = size / this.scaleX,
           sizeY = size / this.scaleY,
-          scaleOffsetY = (padding + size2) / this.scaleY,
-          scaleOffsetX = (padding + size2) / this.scaleX,
-          scaleOffsetSizeX = (padding + size2 - size) / this.scaleX,
-          scaleOffsetSizeY = (padding + size2 - size) / this.scaleY,
-          height = this.height;
+          paddingX = this.padding / this.scaleX,
+          paddingY = this.padding / this.scaleY,
+          scaleOffsetY = size2 / this.scaleY,
+          scaleOffsetX = size2 / this.scaleX,
+          scaleOffsetSizeX = (size2 - size) / this.scaleX,
+          scaleOffsetSizeY = (size2 - size) / this.scaleY,
+          height = this.height,
+          width = this.width;
 
       ctx.save();
 
+      ctx.lineWidth = 1 / Math.max(this.scaleX, this.scaleY);
+
       ctx.globalAlpha = this.isMoving ? this.borderOpacityWhenMoving : 1;
-      ctx.fillStyle = this.cornerColor;
+      ctx.strokeStyle = ctx.fillStyle = this.cornerColor;
 
       // top-left
-      _left = left - scaleOffsetX - strokeWidth2;
-      _top = top - scaleOffsetY - strokeWidth2;
-      ctx.fillRect(_left, _top, sizeX, sizeY);
+      _left = left - scaleOffsetX - strokeWidth2 - paddingX;
+      _top = top - scaleOffsetY - strokeWidth2 - paddingY;
+
+      ctx.clearRect(_left, _top, sizeX, sizeY);
+      ctx.strokeRect(_left, _top, sizeX, sizeY);
 
       // top-right
-      _left = left + this.width - scaleOffsetX + strokeWidth2;
-      _top = top - scaleOffsetY - strokeWidth2;
-      ctx.fillRect(_left, _top, sizeX, sizeY);
+      _left = left + width - scaleOffsetX + strokeWidth2 + paddingX;
+      _top = top - scaleOffsetY - strokeWidth2 - paddingY;
+
+      ctx.clearRect(_left, _top, sizeX, sizeY);
+      ctx.strokeRect(_left, _top, sizeX, sizeY);
 
       // bottom-left
-      _left = left - scaleOffsetX - strokeWidth2;
-      _top = top + height + scaleOffsetSizeY + strokeWidth2;
-      ctx.fillRect(_left, _top, sizeX, sizeY);
+      _left = left - scaleOffsetX - strokeWidth2 - paddingX;
+      _top = top + height + scaleOffsetSizeY + strokeWidth2 + paddingY;
+
+      ctx.clearRect(_left, _top, sizeX, sizeY);
+      ctx.strokeRect(_left, _top, sizeX, sizeY);
 
       // bottom-right
-      _left = left + this.width + scaleOffsetSizeX + strokeWidth2;
-      _top = top + height + scaleOffsetSizeY + strokeWidth2;
-      ctx.fillRect(_left, _top, sizeX, sizeY);
+      _left = left + width + scaleOffsetSizeX + strokeWidth2 + paddingX;
+      _top = top + height + scaleOffsetSizeY + strokeWidth2 + paddingY;
 
-      // middle-top
-      _left = left + this.width/2 - scaleOffsetX;
-      _top = top - scaleOffsetY - strokeWidth2;
-      ctx.fillRect(_left, _top, sizeX, sizeY);
+      ctx.clearRect(_left, _top, sizeX, sizeY);
+      ctx.strokeRect(_left, _top, sizeX, sizeY);
 
-      // middle-bottom
-      _left = left + this.width/2 - scaleOffsetX;
-      _top = top + height + scaleOffsetSizeY + strokeWidth2;
-      ctx.fillRect(_left, _top, sizeX, sizeY);
+      if (!this.lockUniScaling) {
+        // middle-top
+        _left = left + width/2 - scaleOffsetX;
+        _top = top - scaleOffsetY - strokeWidth2 - paddingY;
 
-      // middle-right
-      _left = left + this.width + scaleOffsetSizeX + strokeWidth2;
-      _top = top + height/2 - scaleOffsetY;
-      ctx.fillRect(_left, _top, sizeX, sizeY);
+        ctx.clearRect(_left, _top, sizeX, sizeY);
+        ctx.strokeRect(_left, _top, sizeX, sizeY);
 
-      // middle-left
-      _left = left - scaleOffsetX - strokeWidth2;
-      _top = top + height/2 - scaleOffsetY;
-      ctx.fillRect(_left, _top, sizeX, sizeY);
+        // middle-bottom
+        _left = left + width/2 - scaleOffsetX;
+        _top = top + height + scaleOffsetSizeY + strokeWidth2 + paddingY;
+
+        ctx.clearRect(_left, _top, sizeX, sizeY);
+        ctx.strokeRect(_left, _top, sizeX, sizeY);
+
+        // middle-right
+        _left = left + width + scaleOffsetSizeX + strokeWidth2 + paddingX;
+        _top = top + height/2 - scaleOffsetY;
+
+        ctx.clearRect(_left, _top, sizeX, sizeY);
+        ctx.strokeRect(_left, _top, sizeX, sizeY);
+
+        // middle-left
+        _left = left - scaleOffsetX - strokeWidth2 - paddingX;
+        _top = top + height/2 - scaleOffsetY;
+
+        ctx.clearRect(_left, _top, sizeX, sizeY);
+        ctx.strokeRect(_left, _top, sizeX, sizeY);
+      }
 
       // middle-top-rotate
       if (this.hasRotatingPoint) {
-        // _left = left + this.width/2;
-        // _top = top - (45 / this.scaleY) + scaleOffsetY;
 
-        // ctx.save();
-        // ctx.beginPath();
-        // ctx.arc(_left, _top, sizeX / 2, 0, Math.PI * 2, false);
-        // ctx.fill();
-        // ctx.restore();
-
-        _left = left + this.width/2 - scaleOffsetX;
+        _left = left + width/2 - scaleOffsetX;
 
         _top = this.flipY ?
-          (top + height + (this.rotatingPointOffset / this.scaleY) - sizeY/2 + strokeWidth2)
-          : (top - (this.rotatingPointOffset / this.scaleY) - sizeY/2 - strokeWidth2);
+          (top + height + (this.rotatingPointOffset / this.scaleY) - sizeY/2 + strokeWidth2 + paddingY)
+          : (top - (this.rotatingPointOffset / this.scaleY) - sizeY/2 - strokeWidth2 - paddingY);
 
-        ctx.fillRect(_left, _top, sizeX, sizeY);
+        ctx.clearRect(_left, _top, sizeX, sizeY);
+        ctx.strokeRect(_left, _top, sizeX, sizeY);
       }
 
       ctx.restore();
@@ -8673,6 +8685,9 @@ fabric.util.object.extend(fabric.StaticCanvas.prototype, {
 
       for (var i in this.oCoords) {
         if (i === 'mtr' && !this.hasRotatingPoint) {
+          return false;
+        }
+        if (this.lockUniScaling && (i === 'mt' || i === 'mr' || i === 'mb' || i === 'ml')) {
           return false;
         }
 
@@ -9248,6 +9263,10 @@ fabric.util.object.extend(fabric.StaticCanvas.prototype, {
     _render: function(ctx) {
       ctx.beginPath();
 
+      if (this.group) {
+        ctx.translate(-this.group.width/2 + this.left, -this.group.height / 2 + this.top);
+      }
+
       // move from center (of virtual box) to its left/top corner
       ctx.moveTo(this.width === 1 ? 0 : (-this.width / 2), this.height === 1 ? 0 : (-this.height / 2));
       ctx.lineTo(this.width === 1 ? 0 : (this.width / 2), this.height === 1 ? 0 : (this.height / 2));
@@ -9714,6 +9733,9 @@ fabric.util.object.extend(fabric.StaticCanvas.prototype, {
       ctx.beginPath();
       ctx.save();
       ctx.globalAlpha *= this.opacity;
+      if (this.transformMatrix && this.group) {
+        ctx.translate(this.cx, this.cy);
+      }
       ctx.transform(1, 0, 0, this.ry/this.rx, 0, 0);
       ctx.arc(noTransform ? this.left : 0, noTransform ? this.top : 0, this.rx, 0, piBy2, false);
       if (this.stroke) {
@@ -9752,14 +9774,24 @@ fabric.util.object.extend(fabric.StaticCanvas.prototype, {
    */
   fabric.Ellipse.fromElement = function(element, options) {
     options || (options = { });
+
     var parsedAttributes = fabric.parseAttributes(element, fabric.Ellipse.ATTRIBUTE_NAMES);
+    var cx = parsedAttributes.left;
+    var cy = parsedAttributes.top;
+
     if ('left' in parsedAttributes) {
       parsedAttributes.left -= (options.width / 2) || 0;
     }
     if ('top' in parsedAttributes) {
       parsedAttributes.top -= (options.height / 2) || 0;
     }
-    return new fabric.Ellipse(extend(parsedAttributes, options));
+
+    var ellipse = new fabric.Ellipse(extend(parsedAttributes, options));
+
+    ellipse.cx = cx || 0;
+    ellipse.cy = cy || 0;
+
+    return ellipse;
   };
 
   /**
@@ -9860,8 +9892,15 @@ fabric.util.object.extend(fabric.StaticCanvas.prototype, {
       ctx.beginPath();
       ctx.globalAlpha *= this.opacity;
 
-      if (this.group) {
-        ctx.translate(this.x || 0, this.y || 0);
+      if (this.transformMatrix && this.group) {
+        ctx.translate(
+          this.width / 2 + this.x,
+          this.height / 2 + this.y);
+      }
+      if (!this.transformMatrix && this.group) {
+        ctx.translate(
+          -this.group.width / 2 + this.width / 2 + this.x,
+          -this.group.height / 2 + this.height / 2 + this.y);
       }
 
       ctx.moveTo(x+rx, y);
@@ -11103,6 +11142,12 @@ fabric.util.object.extend(fabric.StaticCanvas.prototype, {
 
     /**
      * @property
+     * @type String
+     */
+    fill: '',
+
+    /**
+     * @property
      * @type Boolean
      */
     forceFillOverwrite: false,
@@ -11157,24 +11202,21 @@ fabric.util.object.extend(fabric.StaticCanvas.prototype, {
 
     /**
      * Sets certain property to a certain value
-     * @method set
+     * @method _set
      * @param {String} prop
      * @param {Any} value
      * @return {fabric.PathGroup} thisArg
      */
-    set: function(prop, value) {
-      if ((prop === 'fill' || prop === 'overlayFill') && this.isSameColor()) {
-        this[prop] = value;
+    _set: function(prop, value) {
+
+      if ((prop === 'fill' || prop === 'overlayFill') && value && this.isSameColor()) {
         var i = this.paths.length;
         while (i--) {
-          this.paths[i].set(prop, value);
+          this.paths[i]._set(prop, value);
         }
       }
-      else {
-        // skipping parent "class" - fabric.Path
-        parentSet.call(this, prop, value);
-      }
-      return this;
+
+      return this.callSuper('_set', prop, value);
     },
 
     /**
@@ -11928,6 +11970,9 @@ fabric.util.object.extend(fabric.StaticCanvas.prototype, {
       ctx.save();
       var m = this.transformMatrix;
       this._resetWidthHeight();
+      if (this.group) {
+        ctx.translate(-this.group.width/2 + this.width/2, -this.group.height/2 + this.height/2);
+      }
       if (m) {
         ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
       }
@@ -12973,7 +13018,7 @@ fabric.Image.filters.Tint.fromObject = function(object) {
       this._initStateProperties();
       this.text = text;
       this.setOptions(options || { });
-      this.theta = this.angle * Math.PI / 180;
+      this._theta = this.angle * Math.PI / 180;
       this._initDimensions();
       this.setCoords();
     },
@@ -13555,6 +13600,7 @@ fabric.Image.filters.Tint.fromObject = function(object) {
      */
     setFontsize: function(value) {
       this.set('fontSize', value);
+      this._initDimensions();
       this.setCoords();
       return this;
     },
@@ -13577,6 +13623,7 @@ fabric.Image.filters.Tint.fromObject = function(object) {
      */
     setText: function(value) {
       this.set('text', value);
+      this._initDimensions();
       this.setCoords();
       return this;
     },
@@ -13589,19 +13636,11 @@ fabric.Image.filters.Tint.fromObject = function(object) {
      * @return {fabric.Text} thisArg
      * @chainable
      */
-    set: function(name, value) {
-      if (typeof name == 'object') {
-        for (var prop in name) {
-          this.set(prop, name[prop]);
-        }
+    _set: function(name, value) {
+      if (name === 'fontFamily' && this.path) {
+        this.path = this.path.replace(/(.*?)([^\/]*)(\.font\.js)/, '$1' + value + '$3');
       }
-      else {
-        this[name] = value;
-        if (name === 'fontFamily' && this.path) {
-          this.path = this.path.replace(/(.*?)([^\/]*)(\.font\.js)/, '$1' + value + '$3');
-        }
-      }
-      return this;
+      this.callSuper('_set', name, value);
     }
   });
 
