@@ -1,7 +1,7 @@
 /* build: `node build.js modules=ALL` */
 /*! Fabric.js Copyright 2008-2012, Printio (Juriy Zaytsev, Maxim Chernyak) */
 
-var fabric = fabric || { version: "0.9.17" };
+var fabric = fabric || { version: "0.9.16" };
 
 if (typeof exports != 'undefined') {
   exports.fabric = fabric;
@@ -5422,14 +5422,6 @@ fabric.util.string = {
 
       // delegate rendering to group selection (if one exists)
       if (activeGroup) {
-        //Store objects in group preserving order, then replace
-        var sortedObjects = [];
-        this.forEachObject(function (object) {
-            if (activeGroup.contains(object)) {
-                sortedObjects.push(object);
-            }
-        });
-        activeGroup._set('objects', sortedObjects);
         this._draw(this.contextTop, activeGroup);
       }
 
@@ -6390,10 +6382,11 @@ fabric.util.string = {
           this.onBeforeScaleRotate(target);
         }
 
+        this._setupCurrentTransform(e, target);
+
         var shouldHandleGroupLogic = e.shiftKey && (activeGroup || this.getActiveObject()) && this.selection;
         if (shouldHandleGroupLogic) {
           this._handleGroupLogic(e, target);
-          target = this.getActiveGroup();
         }
         else {
           if (target !== this.getActiveGroup()) {
@@ -6401,8 +6394,6 @@ fabric.util.string = {
           }
           this.setActiveObject(target, e);
         }
-
-        this._setupCurrentTransform(e, target);
       }
       // we must renderAll so that active image is placed on the top canvas
       this.renderAll();
@@ -6709,7 +6700,6 @@ fabric.util.string = {
       if (activeGroup) {
         if (activeGroup.contains(target)) {
           activeGroup.removeWithUpdate(target);
-          this._resetObjectTransform(activeGroup);
           target.setActive(false);
           if (activeGroup.size() === 1) {
             // remove group alltogether if after removal it only contains 1 object
@@ -6718,7 +6708,6 @@ fabric.util.string = {
         }
         else {
           activeGroup.addWithUpdate(target);
-          this._resetObjectTransform(activeGroup);
         }
         this.fire('selection:created', { target: activeGroup, e: e });
         activeGroup.setActive(true);
@@ -6896,16 +6885,6 @@ fabric.util.string = {
      */
     _setCursor: function (value) {
       this.upperCanvasEl.style.cursor = value;
-    },
-
-    /**
-    * @private
-    * @method _resetObjectTransform: 
-    */
-    _resetObjectTransform: function (target) {
-        target.scaleX = 1;
-        target.scaleY = 1;
-        target.setAngle(0);
     },
 
     /**
@@ -11792,10 +11771,9 @@ fabric.util.object.extend(fabric.StaticCanvas.prototype, {
 
       var groupScaleFactor = Math.max(this.scaleX, this.scaleY);
 
-      //The array is now sorted in order of highest first, so start from end.
-      for (var i = this.objects.length; i > 0; i--) {
+      for (var i = 0, len = this.objects.length; i < len; i++) {
 
-        var object = this.objects[i-1];
+        var object = this.objects[i];
         var originalScaleFactor = object.borderScaleFactor;
 
         object.borderScaleFactor = groupScaleFactor;
@@ -13100,7 +13078,7 @@ fabric.Image.filters.Tint.fromObject = function(object) {
      * @property
      * @type Number
      */
-    fontWeight:       400,
+    fontWeight:       100,
 
     /**
      * @property
@@ -13377,7 +13355,7 @@ fabric.Image.filters.Tint.fromObject = function(object) {
       ctx.fillStyle = this.fill;
       ctx.strokeStyle = this.strokeStyle;
       ctx.lineWidth = this.strokeWidth;
-      ctx.textBaseline = 'alphabetic';
+      ctx.textBaseline = 'top';
       ctx.textAlign = this.textAlign;
       ctx.font = this._getFontDeclaration();
     },
@@ -13448,7 +13426,7 @@ fabric.Image.filters.Tint.fromObject = function(object) {
         ctx.fillText(
           textLines[i],
           -this.width / 2,
-          (-this.height / 2) + (i * this.fontSize * this.lineHeight) + this.fontSize
+          (-this.height / 2) + (i * this.fontSize * this.lineHeight)
         );
       }
     },
@@ -13463,7 +13441,7 @@ fabric.Image.filters.Tint.fromObject = function(object) {
           ctx.strokeText(
             textLines[i],
             -this.width / 2,
-            (-this.height / 2) + (i * this.fontSize * this.lineHeight) + this.fontSize
+            (-this.height / 2) + (i * this.fontSize * this.lineHeight)
           );
         }
       }
