@@ -1,6 +1,6 @@
 module Fabric
   module Rails
-    VERSION = "0.9.16"
-    FABRIC_VERSION = "0.9.16"
+    VERSION = "1.0.12"
+    FABRIC_VERSION = "1.0.12"
   end
 end
