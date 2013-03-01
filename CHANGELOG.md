@@ -1,3 +1,11 @@
+## 1.0.12.1 (28 February 2013)
+
+  - now use fabric.js source files and compile as needed via sprockets
+
+## 1.0.12 (21 February 2013)
+
+  - fabric.js version 1.0.12
+
 ## 1.0.11 (19 February 2013)
 
   - fabric.js version 1.0.11
@@ -5,6 +13,14 @@
 ## 1.0.10 (18 February 2013)
 
   - fabric.js version 1.0.10
+
+## 0.9.17 (19 February 2013)
+
+  - fabric.js version 0.9.17
+
+## 0.9.16 (19 February 2013)
+
+  - fabric.js version 0.9.16
 
 ## 0.0.8 (19 September 2012)
 
