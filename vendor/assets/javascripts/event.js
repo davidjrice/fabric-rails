@@ -9,9 +9,9 @@ if (typeof document == 'undefined' && typeof navigator == 'undefined') {
  ----------------------------------------------------
  https://github.com/mudcube/Event.js
  ----------------------------------------------------
- 1	: click, dblclick, dbltap
- 1+	: tap, longpress, drag, swipe
- 2+	: pinch, rotate
+ 1  : click, dblclick, dbltap
+ 1+ : tap, longpress, drag, swipe
+ 2+ : pinch, rotate
  : mousewheel, devicemotion, shake
  ----------------------------------------------------
  TODO
@@ -26,7 +26,7 @@ if (typeof document == 'undefined' && typeof navigator == 'undefined') {
  ----------------------------------------------------
  REQUIREMENTS: querySelector, querySelectorAll
  ----------------------------------------------------
- *	There are two ways to add/remove events with this library.
+ *  There are two ways to add/remove events with this library.
  ----------------------------------------------------
  // Retains "this" attribute as target, and overrides native addEventListener.
  target.addEventListener(type, listener, useCapture);
@@ -36,12 +36,12 @@ if (typeof document == 'undefined' && typeof navigator == 'undefined') {
  Event.add(type, listener, configure);
  Event.remove(type, listener, configure);
 
- *	You can turn prototyping on/off for individual features.
+ *  You can turn prototyping on/off for individual features.
  ----------------------------------------------------
  Event.modifyEventListener = true; // add custom *EventListener commands to HTMLElements.
  Event.modifySelectors = true; // add bulk *EventListener commands on NodeLists from querySelectorAll and others.
 
- *	Example of setting up a single listener with a custom configuration.
+ *  Example of setting up a single listener with a custom configuration.
  ----------------------------------------------------
  // optional configuration.
  var configure = {
@@ -60,7 +60,7 @@ if (typeof document == 'undefined' && typeof navigator == 'undefined') {
  console.log(self.velocity, self.angle, self.fingers);
  }, configure);
 
- *	Multiple listeners glued together.
+ *  Multiple listeners glued together.
  ----------------------------------------------------
  // adding with addEventListener()
  target.addEventListener("click swipe", function(event) { });
@@ -68,7 +68,7 @@ if (typeof document == 'undefined' && typeof navigator == 'undefined') {
  // adding with Event.add()
  Event.add(target, "click swipe", function(event, self) { });
 
- *	Use query selectors to create an event (querySelectorAll)
+ *  Use query selectors to create an event (querySelectorAll)
  ----------------------------------------------------
  // adding events to NodeList from querySelectorAll()
  document.querySelectorAll("#element a.link").addEventListener("click", callback);
@@ -76,7 +76,7 @@ if (typeof document == 'undefined' && typeof navigator == 'undefined') {
  // adding with Event.add()
  Event.add("#element a.link", "click", callback);
 
- *	Listen for selector to become available (querySelector)
+ *  Listen for selector to become available (querySelector)
  ----------------------------------------------------
  Event.add("body", "ready", callback);
  // or...
@@ -88,7 +88,7 @@ if (typeof document == 'undefined' && typeof navigator == 'undefined') {
  listener: callback
  });
 
- *	Multiple listeners bound to one callback w/ single configuration.
+ *  Multiple listeners bound to one callback w/ single configuration.
  ----------------------------------------------------
  var bindings = Event.add({
  target: target,
@@ -109,7 +109,7 @@ if (typeof document == 'undefined' && typeof navigator == 'undefined') {
  }
  });
 
- *	Multiple listeners bound to multiple callbacks w/ single configuration.
+ *  Multiple listeners bound to multiple callbacks w/ single configuration.
  ----------------------------------------------------
  var bindings = Event.add({
  target: target,
@@ -125,7 +125,7 @@ if (typeof document == 'undefined' && typeof navigator == 'undefined') {
  }
  });
 
- *	Multiple listeners bound to multiple callbacks w/ multiple configurations.
+ *  Multiple listeners bound to multiple callbacks w/ multiple configurations.
  ----------------------------------------------------
  var binding = Event.add({
  target: target,
@@ -148,7 +148,7 @@ if (typeof document == 'undefined' && typeof navigator == 'undefined') {
  }
  });
 
- *	Capturing an event and manually forwarding it to a proxy (tiered events).
+ *  Capturing an event and manually forwarding it to a proxy (tiered events).
  ----------------------------------------------------
  Event.add(target, "down", function(event, self) {
  var x = event.pageX; // local variables that wont change.
@@ -164,9 +164,9 @@ if (typeof document == 'undefined' && typeof navigator == 'undefined') {
  });
  ----------------------------------------------------
 
- *	Event proxies.
- *	type, fingers, state, start, x, y, position, bbox
- *	rotation, scale, velocity, angle, delay, timeout
+ *  Event proxies.
+ *  type, fingers, state, start, x, y, position, bbox
+ *  rotation, scale, velocity, angle, delay, timeout
  ----------------------------------------------------
  // "Click" :: fingers, minFingers, maxFingers.
  Event.add(window, "click", function(event, self) {
@@ -209,18 +209,18 @@ if (typeof document == 'undefined' && typeof navigator == 'undefined') {
  console.log(self.gesture, self.state, self.wheelDelta);
  });
 
- *	Stop, prevent and cancel.
+ *  Stop, prevent and cancel.
  ----------------------------------------------------
  Event.stop(event); // stop bubble.
  Event.prevent(event); // prevent default.
  Event.cancel(event); // stop and prevent.
 
- *	Track for proper command/control-key for Mac/PC.
+ *  Track for proper command/control-key for Mac/PC.
  ----------------------------------------------------
  Event.add(window, "keyup keydown", Event.proxy.metaTracker);
  console.log(Event.proxy.metaKey);
 
- *	Test for event features, in this example Drag & Drop file support.
+ *  Test for event features, in this example Drag & Drop file support.
  ----------------------------------------------------
  console.log(Event.supports('dragstart') && Event.supports('drop') && !!window.FileReader);
 
@@ -813,7 +813,7 @@ Event.proxy = (function(root) {
             track.up = true;
             conf.fingers--;
         }
-        /*	// This should work but fails in Safari on iOS4 so not using it.
+        /*  // This should work but fails in Safari on iOS4 so not using it.
          var touches = event.changedTouches || root.getCoords(event);
          var length = touches.length;
          // Record changed touches have ended (this should work).

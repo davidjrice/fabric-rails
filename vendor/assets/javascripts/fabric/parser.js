@@ -10,23 +10,42 @@
   var fabric = global.fabric || (global.fabric = { }),
       extend = fabric.util.object.extend,
       capitalize = fabric.util.string.capitalize,
-      clone = fabric.util.object.clone;
+      clone = fabric.util.object.clone,
+      toFixed = fabric.util.toFixed,
+      multiplyTransformMatrices = fabric.util.multiplyTransformMatrices;
+
+  fabric.SHARED_ATTRIBUTES = [
+    "transform",
+    "fill", "fill-opacity", "fill-rule",
+    "opacity",
+    "stroke", "stroke-dasharray", "stroke-linecap", "stroke-linejoin", "stroke-miterlimit", "stroke-opacity", "stroke-width"
+  ];
 
   var attributesMap = {
+    'fill-opacity':     'fillOpacity',
+    'fill-rule':        'fillRule',
+    'font-family':      'fontFamily',
+    'font-size':        'fontSize',
+    'font-style':       'fontStyle',
+    'font-weight':      'fontWeight',
     'cx':               'left',
     'x':                'left',
+    'r':                'radius',
+    'stroke-dasharray': 'strokeDashArray',
+    'stroke-linecap':   'strokeLineCap',
+    'stroke-linejoin':  'strokeLineJoin',
+    'stroke-miterlimit':'strokeMiterLimit',
+    'stroke-opacity':   'strokeOpacity',
+    'stroke-width':     'strokeWidth',
+    'text-decoration':  'textDecoration',
     'cy':               'top',
     'y':                'top',
-    'r':                'radius',
-    'fill-opacity':     'opacity',
-    'fill-rule':        'fillRule',
-    'stroke-width':     'strokeWidth',
-    'transform':        'transformMatrix',
-    'text-decoration':  'textDecoration',
-    'font-size':        'fontSize',
-    'font-weight':      'fontWeight',
-    'font-style':       'fontStyle',
-    'font-family':      'fontFamily'
+    'transform':        'transformMatrix'
+  };
+
+  var colorAttributes = {
+    'stroke': 'strokeOpacity',
+    'fill':   'fillOpacity'
   };
 
   function normalizeAttr(attr) {
@@ -37,12 +56,57 @@
     return attr;
   }
 
+  function normalizeValue(attr, value, parentAttributes) {
+    var isArray;
+
+    if ((attr === 'fill' || attr === 'stroke') && value === 'none') {
+      value = '';
+    }
+    else if (attr === 'fillRule') {
+      value = (value === 'evenodd') ? 'destination-over' : value;
+    }
+    else if (attr === 'strokeDashArray') {
+      value = value.replace(/,/g, ' ').split(/\s+/);
+    }
+    else if (attr === 'transformMatrix') {
+      if (parentAttributes && parentAttributes.transformMatrix) {
+        value = multiplyTransformMatrices(
+          parentAttributes.transformMatrix, fabric.parseTransformAttribute(value));
+      }
+      else {
+        value = fabric.parseTransformAttribute(value);
+      }
+    }
+
+    isArray = Object.prototype.toString.call(value) === '[object Array]';
+
+    // TODO: need to normalize em, %, pt, etc. to px (!)
+    var parsed = isArray ? value.map(parseFloat) : parseFloat(value);
+
+    return (!isArray && isNaN(parsed) ? value : parsed);
+  }
+
+  /**
+   * @private
+   * @param {Object} attributes Array of attributes to parse
+   */
+  function _setStrokeFillOpacity(attributes) {
+    for (var attr in colorAttributes) {
+      if (!attributes[attr] || typeof attributes[colorAttributes[attr]] === 'undefined') continue;
+
+      var color = new fabric.Color(attributes[attr]);
+      attributes[attr] = color.setAlpha(toFixed(color.getAlpha() * attributes[colorAttributes[attr]], 2)).toRgba();
+
+      delete attributes[colorAttributes[attr]];
+    }
+    return attributes;
+  }
+
   /**
    * Returns an object of attributes' name/value, given element and an array of attribute names;
    * Parses parent "g" nodes recursively upwards.
    * @static
    * @memberOf fabric
-   * @method parseAttributes
    * @param {DOMElement} element Element to parse
    * @param {Array} attributes Array of attributes to parse
    * @return {Object} object containing parsed attributes' names/values
@@ -54,7 +118,6 @@
     }
 
     var value,
-        parsed,
         parentAttributes = { };
 
     // if there's a parent container (`g` node), parse its attributes recursively upwards
@@ -64,20 +127,11 @@
 
     var ownAttributes = attributes.reduce(function(memo, attr) {
       value = element.getAttribute(attr);
-      parsed = parseFloat(value);
       if (value) {
-        // "normalize" attribute values
-        if ((attr === 'fill' || attr === 'stroke') && value === 'none') {
-          value = '';
-        }
-        if (attr === 'fill-rule') {
-          value = (value === 'evenodd') ? 'destination-over' : value;
-        }
-        if (attr === 'transform') {
-          value = fabric.parseTransformAttribute(value);
-        }
         attr = normalizeAttr(attr);
-        memo[attr] = isNaN(parsed) ? value : parsed;
+        value = normalizeValue(attr, value, parentAttributes);
+
+        memo[attr] = value;
       }
       return memo;
     }, { });
@@ -85,8 +139,9 @@
     // add values parsed from style, which take precedence over attributes
     // (see: http://www.w3.org/TR/SVG/styling.html#UsingPresentationAttributes)
 
-    ownAttributes = extend(ownAttributes, extend(getGlobalStylesForElement(element), fabric.parseStyleAttribute(element)));
-    return extend(parentAttributes, ownAttributes);
+    ownAttributes = extend(ownAttributes,
+      extend(getGlobalStylesForElement(element), fabric.parseStyleAttribute(element)));
+    return _setStrokeFillOpacity(extend(parentAttributes, ownAttributes));
   }
 
   /**
@@ -94,7 +149,6 @@
    * @static
    * @function
    * @memberOf fabric
-   * @method parseTransformAttribute
    * @param attributeValue {String} string containing attribute value
    * @return {Array} array of 6 elements representing transformation matrix
    */
@@ -177,12 +231,13 @@
         reTransformList = new RegExp(transform_list),
         // == end transform regexp
 
-        reTransform = new RegExp(transform);
+        reTransform = new RegExp(transform, 'g');
 
     return function(attributeValue) {
 
       // start with identity matrix
       var matrix = iMatrix.concat();
+      var matrices = [ ];
 
       // return if no argument was given or
       // an argument does not match transform attribute regexp
@@ -218,8 +273,19 @@
             matrix = args;
             break;
         }
+
+        // snapshot current matrix into matrices array
+        matrices.push(matrix.concat());
+        // reset
+        matrix = iMatrix.concat();
       });
-      return matrix;
+
+      var combinedMatrix = matrices[0];
+      while (matrices.length > 1) {
+        matrices.shift();
+        combinedMatrix = fabric.util.multiplyTransformMatrices(combinedMatrix, matrices[0]);
+      }
+      return combinedMatrix;
     };
   })();
 
@@ -227,7 +293,6 @@
    * Parses "points" attribute, returning an array of values
    * @static
    * @memberOf fabric
-   * @method parsePointsAttribute
    * @param points {String} points attribute string
    * @return {Array} array of points
    */
@@ -267,38 +332,76 @@
     return parsedPoints;
   }
 
+  function parseFontDeclaration(value, oStyle) {
+
+    // TODO: support non-px font size
+    var match = value.match(/(normal|italic)?\s*(normal|small-caps)?\s*(normal|bold|bolder|lighter|100|200|300|400|500|600|700|800|900)?\s*(\d+)px\s+(.*)/);
+
+    if (!match) return;
+
+    var fontStyle = match[1];
+    // Font variant is not used
+    // var fontVariant = match[2];
+    var fontWeight = match[3];
+    var fontSize = match[4];
+    var fontFamily = match[5];
+
+    if (fontStyle) {
+      oStyle.fontStyle = fontStyle;
+    }
+    if (fontWeight) {
+      oStyle.fontSize = isNaN(parseFloat(fontWeight)) ? fontWeight : parseFloat(fontWeight);
+    }
+    if (fontSize) {
+      oStyle.fontSize = parseFloat(fontSize);
+    }
+    if (fontFamily) {
+      oStyle.fontFamily = fontFamily;
+    }
+  }
+
   /**
    * Parses "style" attribute, retuning an object with values
    * @static
    * @memberOf fabric
-   * @method parseStyleAttribute
    * @param {SVGElement} element Element to parse
    * @return {Object} Objects with values parsed from style attribute of an element
    */
   function parseStyleAttribute(element) {
     var oStyle = { },
-        style = element.getAttribute('style');
+        style = element.getAttribute('style'),
+        attr, value;
 
     if (!style) return oStyle;
 
     if (typeof style === 'string') {
-      style = style.replace(/;$/, '').split(';').forEach(function (current) {
+      style.replace(/;$/, '').split(';').forEach(function (chunk) {
+        var pair = chunk.split(':');
 
-        var attr = current.split(':');
-        var value = attr[1].trim();
+        attr = normalizeAttr(pair[0].trim().toLowerCase());
+        value = normalizeValue(attr, pair[1].trim());
 
-        // TODO: need to normalize em, %, pt, etc. to px (!)
-        var parsed = parseFloat(value);
-
-        oStyle[normalizeAttr(attr[0].trim().toLowerCase())] = isNaN(parsed) ? value : parsed;
+        if (attr === 'font') {
+          parseFontDeclaration(value, oStyle);
+        }
+        else {
+          oStyle[attr] = value;
+        }
       });
     }
     else {
       for (var prop in style) {
         if (typeof style[prop] === 'undefined') continue;
 
-        var parsed = parseFloat(style[prop]);
-        oStyle[normalizeAttr(prop.toLowerCase())] = isNaN(parsed) ? style[prop] : parsed;
+        attr = normalizeAttr(prop.toLowerCase());
+        value = normalizeValue(attr, style[prop]);
+
+        if (attr === 'font') {
+          parseFontDeclaration(value, oStyle);
+        }
+        else {
+          oStyle[attr] = value;
+        }
       }
     }
 
@@ -325,7 +428,6 @@
    * Transforms an array of svg elements to corresponding fabric.* instances
    * @static
    * @memberOf fabric
-   * @method parseElements
    * @param {Array} elements Array of elements to parse
    * @param {Function} callback Being passed an array of fabric instances (transformed from SVG elements)
    * @param {Object} [options] Options object
@@ -356,7 +458,7 @@
                 instances.splice(index, 0, obj);
                 checkIfDone();
               };
-            })(index), options);
+            })(index, el), options);
           }
           else {
             var obj = klass.fromElement(el, options);
@@ -380,7 +482,6 @@
    * @static
    * @function
    * @memberOf fabric
-   * @method getCSSRules
    * @param {SVGDocument} doc SVG document to parse
    * @return {Object} CSS rules of this document
    */
@@ -451,7 +552,6 @@
    * @static
    * @function
    * @memberOf fabric
-   * @method parseSVGDocument
    * @param {SVGDocument} doc SVG document to parse
    * @param {Function} callback Callback to call when parsing is finished; It's being passed an array of elements (parsed from a document).
    * @param {Function} [reviver] Method for further parsing of SVG elements, called after each fabric object created.
@@ -546,15 +646,13 @@
     };
   })();
 
-  /**
+   /**
     * Used for caching SVG documents (loaded via `fabric.Canvas#loadSVGFromURL`)
-    * @property
     * @namespace
     */
    var svgCache = {
 
      /**
-      * @method has
       * @param {String} name
       * @param {Function} callback
       */
@@ -563,7 +661,6 @@
      },
 
      /**
-      * @method get
       * @param {String} url
       * @param {Function} callback
       */
@@ -572,7 +669,6 @@
      },
 
      /**
-      * @method set
       * @param {String} url
       * @param {Object} object
       */
@@ -582,8 +678,7 @@
    };
 
    /**
-    * Takes url corresponding to an SVG document, and parses it into a set of fabric objects
-    * @method loadSVGFromURL
+    * Takes url corresponding to an SVG document, and parses it into a set of fabric objects. Note that SVG is fetched via XMLHttpRequest, so it needs to conform to SOP (Same Origin Policy)
     * @memberof fabric
     * @param {String} url
     * @param {Function} callback
@@ -630,8 +725,8 @@
    }
 
   /**
-  * @method _enlivenCachedObject
-  */
+   * @private
+   */
   function _enlivenCachedObject(cachedObject) {
 
    var objects = cachedObject.objects,
@@ -646,7 +741,6 @@
 
   /**
     * Takes string corresponding to an SVG document, and parses it into a set of fabric objects
-    * @method loadSVGFromString
     * @memberof fabric
     * @param {String} string
     * @param {Function} callback
@@ -675,7 +769,6 @@
 
   /**
    * Creates markup containing SVG font faces
-   * @method createSVGFontFacesMarkup
    * @param {Array} objects Array of fabric objects
    * @return {String}
    */
@@ -708,7 +801,6 @@
 
   /**
    * Creates markup containing SVG referenced elements like patterns, gradients etc.
-   * @method createSVGRefElementsMarkup
    * @param {fabric.Canvas} canvas instance of fabric.Canvas
    * @return {String}
    */
@@ -732,6 +824,35 @@
     return markup;
   }
 
+  /**
+   * Parses an SVG document, returning all of the gradient declarations found in it
+   * @static
+   * @function
+   * @memberOf fabric
+   * @param {SVGDocument} doc SVG document to parse
+   * @return {Object} Gradient definitions; key corresponds to element id, value -- to gradient definition element
+   */
+  function getGradientDefs(doc) {
+    var linearGradientEls = doc.getElementsByTagName('linearGradient'),
+        radialGradientEls = doc.getElementsByTagName('radialGradient'),
+        el, i,
+        gradientDefs = { };
+
+    i = linearGradientEls.length;
+    for (; i--; ) {
+      el = linearGradientEls[i];
+      gradientDefs[el.getAttribute('id')] = el;
+    }
+
+    i = radialGradientEls.length;
+    for (; i--; ) {
+      el = radialGradientEls[i];
+      gradientDefs[el.getAttribute('id')] = el;
+    }
+
+    return gradientDefs;
+  }
+
   extend(fabric, {
 
     parseAttributes:            parseAttributes,
@@ -744,7 +865,9 @@
     loadSVGFromString:          loadSVGFromString,
 
     createSVGFontFacesMarkup:   createSVGFontFacesMarkup,
-    createSVGRefElementsMarkup: createSVGRefElementsMarkup
+    createSVGRefElementsMarkup: createSVGRefElementsMarkup,
+
+    getGradientDefs:            getGradientDefs
   });
 
 })(typeof exports !== 'undefined' ? exports : this);

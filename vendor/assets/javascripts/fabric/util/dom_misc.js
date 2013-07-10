@@ -4,7 +4,6 @@
 
   /**
    * Takes id and returns an element with that id (if one exists in a document)
-   * @method getById
    * @memberOf fabric.util
    * @param {String|HTMLElement} id
    * @return {HTMLElement|null}
@@ -15,7 +14,6 @@
 
   /**
    * Converts an array-like object (e.g. arguments or NodeList) to an array
-   * @method toArray
    * @memberOf fabric.util
    * @param {Object} arrayLike
    * @return {Array}
@@ -42,7 +40,6 @@
 
   /**
    * Creates specified element with specified attributes
-   * @method makeElement
    * @memberOf fabric.util
    * @param {String} tagName Type of an element to create
    * @param {Object} [attributes] Attributes to set on an element
@@ -66,7 +63,6 @@
 
   /**
    * Adds class to an element
-   * @method addClass
    * @memberOf fabric.util
    * @param {HTMLElement} element Element to add class to
    * @param {String} className Class to add to an element
@@ -79,7 +75,6 @@
 
   /**
    * Wraps element with another element
-   * @method wrapElement
    * @memberOf fabric.util
    * @param {HTMLElement} element Element to wrap
    * @param {HTMLElement|String} wrapper Element to wrap with
@@ -99,45 +94,66 @@
 
   /**
    * Returns offset for a given element
-   * @method getElementOffset
    * @function
    * @memberOf fabric.util
    * @param {HTMLElement} element Element to get offset for
    * @return {Object} Object with "left" and "top" properties
    */
   function getElementOffset(element) {
-    // TODO (kangax): need to fix this method
-    var valueT = 0, valueL = 0;
-    do {
-      valueT += element.offsetTop  || 0;
-      valueL += element.offsetLeft || 0;
-      element = element.offsetParent;
+    var docElem, win,
+        box = {left: 0, top: 0},
+        doc = element && element.ownerDocument,
+        offset = {left: 0, top: 0},
+        offsetAttributes = {
+           'borderLeftWidth': 'left',
+           'borderTopWidth':  'top',
+           'paddingLeft':     'left',
+           'paddingTop':      'top'
+        };
+
+    if (!doc){
+      return {left: 0, top: 0};
     }
-    while (element);
-    return ({ left: valueL, top: valueT });
+
+    for (var attr in offsetAttributes) {
+      offset[offsetAttributes[attr]] += parseInt(getElementStyle(element, attr), 10) || 0;
+    }
+
+    docElem = doc.documentElement;
+    if ( typeof element.getBoundingClientRect !== "undefined" ) {
+      box = element.getBoundingClientRect();
+    }
+    if(doc != null && doc === doc.window){
+      win = doc;
+    } else {
+      win = doc.nodeType === 9 && (doc.defaultView || doc.parentWindow);
+    }
+    return {
+      left: box.left + (win.pageXOffset || docElem.scrollLeft) - (docElem.clientLeft || 0) + offset.left,
+      top: box.top + (win.pageYOffset || docElem.scrollTop) - (docElem.clientTop || 0)  + offset.top
+    };
   }
 
   /**
-  * Returns position of a given element
-  * @method getElementPosition
-  * @function
+  * Returns style attribute value of a given element
   * @memberOf fabric.util
-  * @param {HTMLElement} element Element to get offset for
-  * @return {Object} position of the given element.
+  * @param {HTMLElement} element Element to get style attribute for
+  * @param {String} attr Style attribute to get for element
+  * @return {String} Style attribute value of the given element.
   */
-  var getElementPosition;
-  if (fabric.document.defaultView && fabric.document.defaultView.getComputedStyle) {
-    getElementPosition = function (element) {
-      return fabric.document.defaultView.getComputedStyle(element, null).position;
-    };
-  }
-  else {
-    /** @ignore */
-    getElementPosition = function (element) {
-      var value = element.style.position;
-      if (!value && element.currentStyle) value = element.currentStyle.position;
+  function getElementStyle(element, attr) {
+    if (!element.style) {
+      element.style = { };
+    }
+
+    if (fabric.document.defaultView && fabric.document.defaultView.getComputedStyle) {
+      return fabric.document.defaultView.getComputedStyle(element, null)[attr];
+    }
+    else {
+      var value = element.style[attr];
+      if (!value && element.currentStyle) value = element.currentStyle[attr];
       return value;
-    };
+    }
   }
 
   (function () {
@@ -155,7 +171,6 @@
 
     /**
      * Makes element unselectable
-     * @method makeElementUnselectable
      * @memberOf fabric.util
      * @param {HTMLElement} element Element to make unselectable
      * @return {HTMLElement} Element that was passed in
@@ -175,7 +190,6 @@
 
     /**
      * Makes element selectable
-     * @method makeElementSelectable
      * @memberOf fabric.util
      * @param {HTMLElement} element Element to make selectable
      * @return {HTMLElement} Element that was passed in
@@ -201,7 +215,6 @@
 
     /**
      * Inserts a script element with a given url into a document; invokes callback, when that script is finished loading
-     * @method getScript
      * @memberOf fabric.util
      * @param {String} url URL of a script to load
      * @param {Function} callback Callback to execute when script is finished loading
@@ -210,9 +223,6 @@
       var headEl = fabric.document.getElementsByTagName("head")[0],
           scriptEl = fabric.document.createElement('script'),
           loading = true;
-
-      scriptEl.type = 'text/javascript';
-      scriptEl.setAttribute('runat', 'server');
 
       /** @ignore */
       scriptEl.onload = /** @ignore */ scriptEl.onreadystatechange = function(e) {
@@ -240,6 +250,6 @@
   fabric.util.addClass = addClass;
   fabric.util.wrapElement = wrapElement;
   fabric.util.getElementOffset = getElementOffset;
-  fabric.util.getElementPosition = getElementPosition;
+  fabric.util.getElementStyle = getElementStyle;
 
 })();

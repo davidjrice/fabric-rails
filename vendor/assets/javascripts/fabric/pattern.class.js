@@ -1,20 +1,29 @@
 /**
  * Pattern class
- * @class Pattern
- * @memberOf fabric
+ * @class fabric.Pattern
  */
-fabric.Pattern = fabric.util.createClass(/** @scope fabric.Pattern.prototype */ {
+fabric.Pattern = fabric.util.createClass(/** @lends fabric.Pattern.prototype */ {
 
   /**
    * Repeat property of a pattern (one of repeat, repeat-x, repeat-y)
-   * @property
    * @type String
    */
   repeat: 'repeat',
 
   /**
+   * Pattern horizontal offset from object's left/top corner
+   * @type Number
+   */
+  offsetX: 0,
+
+  /**
+   * Pattern vertical offset from object's left/top corner
+   * @type Number
+   */
+  offsetY: 0,
+
+  /**
    * Constructor
-   * @method initialize
    * @param {Object} [options]
    * @return {fabric.Pattern} thisArg
    */
@@ -22,18 +31,38 @@ fabric.Pattern = fabric.util.createClass(/** @scope fabric.Pattern.prototype */ 
     options || (options = { });
 
     if (options.source) {
-      this.source = typeof options.source === 'string'
-        ? new Function(options.source)
-        : options.source;
+      if (typeof options.source === 'string') {
+        // function string
+        if (typeof fabric.util.getFunctionBody(options.source) !== 'undefined') {
+          this.source = new Function(fabric.util.getFunctionBody(options.source));
+        }
+        else {
+          // img src string
+          var _this = this;
+          this.source = fabric.util.createImage();
+          fabric.util.loadImage(options.source, function(img) {
+            _this.source = img;
+          });
+        }
+      }
+      else {
+        // img element
+        this.source = options.source;
+      }
     }
     if (options.repeat) {
       this.repeat = options.repeat;
+    }
+    if (options.offsetX) {
+      this.offsetX = options.offsetX;
+    }
+    if (options.offsetY) {
+      this.offsetY = options.offsetY;
     }
   },
 
   /**
    * Returns object representation of a pattern
-   * @method toObject
    * @return {Object}
    */
   toObject: function() {
@@ -42,8 +71,7 @@ fabric.Pattern = fabric.util.createClass(/** @scope fabric.Pattern.prototype */ 
 
     // callback
     if (typeof this.source === 'function') {
-      source = String(this.source)
-                .match(/function\s+\w*\s*\(.*\)\s+\{([\s\S]*)\}/)[1];
+      source = String(this.source);
     }
     // <img> element
     else if (typeof this.source.src === 'string') {
@@ -52,13 +80,14 @@ fabric.Pattern = fabric.util.createClass(/** @scope fabric.Pattern.prototype */ 
 
     return {
       source: source,
-      repeat: this.repeat
+      repeat: this.repeat,
+      offsetX: this.offsetX,
+      offsetY: this.offsetY
     };
   },
 
   /**
    * Returns an instance of CanvasPattern
-   * @method toLive
    * @param ctx
    * @return {CanvasPattern}
    */
